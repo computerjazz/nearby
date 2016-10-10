@@ -27,7 +27,7 @@ var App = React.createClass({
       this.makeUrl();
     });
 
-    
+
 
    } else {
       // if we can't get user's location, display default location
@@ -55,18 +55,26 @@ var App = React.createClass({
       url: url,
       data: {
         action: 'query',
-        prop: 'extracts',
-        list: 'geosearch',
-        gsradius: this.state.radius,
-        gscoord: myLat + '|' + myLng,
+        prop: 'coordinates|pageimages|pageterms',
+        colimit: 50,
+        piprop: 'thumbnail',
+        pithumbnailsize: 144,
+        pilimit: 50,
+        wbptterms: 'description',
+        generator: 'geosearch',
+        ggsradius: this.state.radius,
+        ggscoord: myLat + '|' + myLng,
+        ggslimit: 50,
         format: 'json'
       },
       contentType: 'application/json',
       dataType: 'jsonp', //specify jsonp
       success: function(rawData) {
-        console.log("Success" + JSON.stringify(rawData.query));
-        var rawData = rawData.query.geosearch;
+
+        var rawData = rawData.query.pages;
+        console.log("Success" + JSON.stringify(rawData, null, 2));
         this.setState({rawData: rawData});
+
         this.setMapData(rawData);
       }.bind(this),
       error: function(e) {
@@ -76,14 +84,22 @@ var App = React.createClass({
   },
 
   setMapData: function(rawData) {
-    var mapData = rawData.map(item => {
-      return {
-        title: item.title,
-        loc: [item.lon, item.lat]
-      }
-    });
 
-    
+    var mapData = [];
+
+    for (var key in rawData) {
+      var currentItem = rawData[key];
+      var item = {};
+
+      // for some reason some items don't have coordinate info
+      if (currentItem.coordinates) {
+        item['pageid'] = currentItem.pageid;
+        item['title'] = currentItem.title;
+        item['loc'] = [currentItem.coordinates[0].lon, currentItem.coordinates[0].lat];
+        //console.log(JSON.stringify(item, null, 2)); 
+        mapData.push(item);
+      }
+    }
 
     this.setState({
       mapData: mapData
@@ -94,23 +110,25 @@ var App = React.createClass({
   render: function() {
     return (
       <Grid className="App" style={{'height': '100%'}}>    
-          <Col className="WikiItem-container" md={3}>
-            <h2>Ready to adventure?</h2>
-            <p className="App-intro">
-          The following sites are nearby:
-          </p>
-          <ul>
-          { this.state.rawData.map(locationObj => (
-            <WikiItem key={locationObj.pageid} data={locationObj} />)
-          )}
-        </ul>
-        </Col>
-        <Col className="MapView-container" md={9} style={{'height': '100%'}}>
-        <MapView apiKey={APIkeys.mapbox} 
-            center={this.state.center}
-            mapData={this.state.mapData} 
-            mapZoom={14} />
-          </Col>
+      <Col className="WikiItem-container" md={3}>
+      <h2>Ready to adventure?</h2>
+      <p className="App-intro">
+      The following sites are nearby:
+      </p>
+      <ul>
+      { this.state.mapData.map(item => (
+        <WikiItem key={item.pageid} 
+        pageid={item.pageid} 
+        title={item.title} />)
+      )}
+      </ul>
+      </Col>
+      <Col className="MapView-container" md={9} style={{'height': '100%'}}>
+      <MapView apiKey={APIkeys.mapbox} 
+      center={this.state.center}
+      mapData={this.state.mapData} 
+      mapZoom={14} />
+      </Col>
       </Grid>
       );
   }
@@ -118,4 +136,4 @@ var App = React.createClass({
 
 })
 
-export default App;
+  export default App;

@@ -13,7 +13,8 @@ var MapView = React.createClass ({
 		var center = nextProps.center;
 		var zoom = nextProps.mapZoom;
 		var mapData = nextProps.mapData;
-
+		console.log(mapData);
+		
 		// only update map if location has changed
 		if (this.state.center[0] !== nextProps.center[0] || this.state.center[1] !== nextProps.center[1]) {
 			this.updateMapCenter(center, zoom);	
