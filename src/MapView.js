@@ -5,7 +5,8 @@ var MapView = React.createClass ({
 	getInitialState: function() {
 		return {
 			center: [0,0],
-			mapData: []
+			mapData: [],
+			zoom: 13
 		};
 	},
 
@@ -14,7 +15,7 @@ var MapView = React.createClass ({
 		var zoom = nextProps.mapZoom;
 		var mapData = nextProps.mapData;
 		console.log(mapData);
-		
+
 		// only update map if location has changed
 		if (this.state.center[0] !== nextProps.center[0] || this.state.center[1] !== nextProps.center[1]) {
 			this.updateMapCenter(center, zoom);	
@@ -64,36 +65,39 @@ var MapView = React.createClass ({
 					},
 					"properties": {
 						"title": item.title,
+						"description": item.extract,
 						"icon": "marker",
-
 					}
 				}
 			});
 
+		/* 
+		An issue with duplicate "points" source IDs forced me to 
+		implement this weirdly. If a source with ID 'points' already exists, 
+		update it with new sourceData. Otherwise create it with sourceData
+		*/
+
+		var formattedMapData = {
+				"type": "geojson",
+				"data": {
+					"type": "FeatureCollection",
+					"features": sourceData
+				},
+				cluster:true,
+				clusterMaxZoom:15
+			};
 		if (map.getSource("points")) {
-			map.getSource("points").setData({
-				"type": "geojson",
-				"data": {
-					"type": "FeatureCollection",
-					"features": sourceData
-				}
-			});
-
+			map.getSource("points").setData(formattedMapData);
 		} else {
-			map.addSource("points", {
-				"type": "geojson",
-				"data": {
-					"type": "FeatureCollection",
-					"features": sourceData
-				}
-			});
-
+			map.addSource("points", formattedMapData);
 		}
-
+		
+		// Add layer for the item locations & titles
 		map.addLayer({
 			"id": "points",
 			"type": "symbol",
 			"source": "points",
+			"filter": ["!has", "point_count"],
 			"layout": {
 				"icon-image": "{icon}-15",
 				"text-field": "{title}",
@@ -103,12 +107,66 @@ var MapView = React.createClass ({
 			}
 		});
 
-	},
-	render: function() {
-		return (<div id="mapDisplay" style={{'height':'100%'}}>
+		// Add layer for the cluster circles
+		map.addLayer({
+            "id": "cluster",
+            "type": "circle",
+            "source": "points",
+            "paint": {
+                "circle-color": '#f28cb1',
+                "circle-radius": 18
+            },
+            "filter": ["all",
+                    [">=", "point_count", 1],
+                    ["<", "point_count", 100]] 
+        });
 
-			</div>);
-	}
-});
+		// Add a layer for the clusters' count labels
+	    map.addLayer({
+	        "id": "cluster-count",
+	        "type": "symbol",
+	        "source": "points",
+	        "layout": {
+	            "text-field": "{point_count}",
+	            "text-font": [
+	                "DIN Offc Pro Medium",
+	                "Arial Unicode MS Bold"
+	            ],
+	            "text-size": 12
+	        }
+	    });
+
+	    // When a click event occurs near a place, open a popup at the location of
+		// the feature, with description HTML from its properties.
+		map.on('click', function (e) {
+		    var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
+
+		    if (!features.length) {
+		        return;
+		    }
+
+		    var feature = features[0];
+		    map.flyTo({center: feature.geometry.coordinates});
+
+		    // Populate the popup and set its coordinates
+		    // based on the feature found.
+		    var popup = new mapboxgl.Popup()
+		        .setLngLat(feature.geometry.coordinates)
+		        .setHTML(feature.properties.description)
+		        .addTo(map);
+		});
+
+		// Use the same approach as above to indicate that the symbols are clickable
+		// by changing the cursor style to 'pointer'.
+		map.on('mousemove', function (e) {
+		    var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
+		    map.getCanvas().style.cursor = (features.length) ? 'pointer' : '';
+		});
+
+			},
+			render: function() {
+				return (<div id="mapDisplay" style={{'height':'100%'}}></div>);
+			}
+		});
 
 export default MapView;

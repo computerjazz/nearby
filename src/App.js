@@ -14,7 +14,8 @@ var App = React.createClass({
       center: [0, 0],
       radius: 2000,
       rawData: [],
-      mapData: []
+      mapData: [],
+      mapZoom: 13
     };
   },
 
@@ -55,7 +56,11 @@ var App = React.createClass({
       url: url,
       data: {
         action: 'query',
-        prop: 'coordinates|pageimages|pageterms',
+        prop: 'coordinates|pageimages|pageterms|extracts',
+        exintro:"",
+        exlimit:"max",
+        exchars: 200,
+        excontinue: 1,
         colimit: 50,
         piprop: 'thumbnail',
         pithumbnailsize: 144,
@@ -90,13 +95,19 @@ var App = React.createClass({
     for (var key in rawData) {
       var currentItem = rawData[key];
       var item = {};
+      var regex = /(<([^>]+)>)/ig;
+
 
       // for some reason some items don't have coordinate info
       if (currentItem.coordinates) {
+        item['index'] = currentItem.index;
         item['pageid'] = currentItem.pageid;
         item['title'] = currentItem.title;
+        item['extract'] = currentItem.extract ? currentItem.extract.replace(regex, "").split(". ")[0] + "." : "";
         item['loc'] = [currentItem.coordinates[0].lon, currentItem.coordinates[0].lat];
-        //console.log(JSON.stringify(item, null, 2)); 
+        item['thumbnail'] = currentItem.thumbnail ? {src: currentItem.thumbnail.source, width: currentItem.thumbnail.width, height: currentItem.thumbnail.height} : "";
+        //item['description'] = currentItem.terms ? currentItem.terms.description : "";
+        console.log(JSON.stringify(item, null, 2)); 
         mapData.push(item);
       }
     }
@@ -110,16 +121,18 @@ var App = React.createClass({
   render: function() {
     return (
       <Grid className="App" style={{'height': '100%'}}>    
-      <Col className="WikiItem-container" md={3}>
+      <Col className="WikiItem-container" md={3} style={{height: '100%', overflow:'scroll'}}>
       <h2>Ready to adventure?</h2>
       <p className="App-intro">
       The following sites are nearby:
       </p>
       <ul>
       { this.state.mapData.map(item => (
-        <WikiItem key={item.pageid} 
+        <WikiItem key={item.index} 
         pageid={item.pageid} 
-        title={item.title} />)
+        title={item.title}
+        extract={item.extract}
+        thumbnail={item.thumbnail} />)
       )}
       </ul>
       </Col>
@@ -127,7 +140,7 @@ var App = React.createClass({
       <MapView apiKey={APIkeys.mapbox} 
       center={this.state.center}
       mapData={this.state.mapData} 
-      mapZoom={14} />
+      mapZoom={this.state.mapZoom} />
       </Col>
       </Grid>
       );
